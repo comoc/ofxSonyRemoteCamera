@@ -77,8 +77,9 @@ void ofxSonyRemoteCamera::update()
 //////////////////////////////////////////////////////////////////////////
 // LiveViewAPIs
 //////////////////////////////////////////////////////////////////////////
-ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::startLiveView()
+ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::startLiveViewCore()
 {
+    
 	waitForThread();
 	mIsLiveViewStreaming = false;
 	closeLiveViewSession();
@@ -700,16 +701,21 @@ bool ofxSonyRemoteCamera::updatePayloadData()
 		jpegSize = mPayloadHeader.jpegSize;
 		unlock();
 	}
-	BYTE* apJpegBytes = new BYTE[jpegSize];
-	mpLiveViewStream->read((char*)apJpegBytes, jpegSize);
+    
+    mApJpegBuffer.allocate(jpegSize);
+	char* apJpegBytes = mApJpegBuffer.getBinaryBuffer();
+	mpLiveViewStream->read(apJpegBytes, jpegSize);
 	if (mpLiveViewStream->gcount() != jpegSize) {
-		delete [] apJpegBytes;
 		return false;
 	}
-	ofBuffer buf((char*)apJpegBytes, jpegSize);
+#if 1
+    if (mJpegBufferListener != 0 && mJpegBufferCallback != 0) {
+        (mJpegBufferListener->*ofxSonyRemoteCamera::mJpegBufferCallback )(mApJpegBuffer);
+    }
+#endif
 	// cvt jpeg to bitmap
 	if (lock()) {
-		ofLoadImage(mLiveViewPixels, buf);
+		ofLoadImage(mLiveViewPixels, mApJpegBuffer);
 		if ( (mLiveViewPixels.getWidth() != mImageSize.width) || (mLiveViewPixels.getHeight() != mImageSize.height)) {
 			mImageSize.width = mLiveViewPixels.getWidth();
 			mImageSize.height = mLiveViewPixels.getHeight();
@@ -719,7 +725,6 @@ bool ofxSonyRemoteCamera::updatePayloadData()
 	} else if (mIsVerbose) {
 		std::cout << "cannot lock" << std::endl;
 	}
-	delete [] apJpegBytes;
 	return true;
 }
 

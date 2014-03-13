@@ -7,7 +7,7 @@
 #include "ofMain.h"
 #include "picojson.h"
 
-#include "Poco/URI.h" 
+#include "Poco/URI.h"
 #include "Poco/File.h"
 #include "Poco/StreamCopier.h" 
 #include "Poco/Net/HTTPClientSession.h"
@@ -104,7 +104,13 @@ public:
 	//-----------------------------------------------------------------
 	// Liveview
 	//-----------------------------------------------------------------
-	SRCError startLiveView();
+    template <class ListenerClass>
+    SRCError startLiveView(ListenerClass* listener, void(ListenerClass::*callback)(const ofBuffer&)){
+        mJpegBufferListener = reinterpret_cast<ofxSonyRemoteCamera*>(listener);
+        mJpegBufferCallback = reinterpret_cast<void(ofxSonyRemoteCamera::*)(const ofBuffer&)>(callback);
+        return startLiveViewCore();
+    }
+    
 	SRCError stopLiveView();
 	bool isLiveViewFrameNew();
 	bool isLiveViewSessionConnected();
@@ -223,6 +229,7 @@ public:
 
 private:
 	virtual void threadedFunction();
+    SRCError startLiveViewCore();
 	bool updateLiveView();
 	bool updateCommonHeader();
 	bool updatePayloadHeader();
@@ -278,6 +285,12 @@ private:
 
 	CommonHeader mCommonHeader;
 	PayloadHeader mPayloadHeader;
+    
+    ofBuffer mApJpegBuffer;
+    
+    ofxSonyRemoteCamera* mJpegBufferListener;
+    void(ofxSonyRemoteCamera::*mJpegBufferCallback)(const ofBuffer&);
+    
 
 	// test
 	std::list<MyHttpPostRequest> mHttpPostList;
