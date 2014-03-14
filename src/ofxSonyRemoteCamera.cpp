@@ -710,7 +710,7 @@ bool ofxSonyRemoteCamera::updatePayloadData()
 	}
 #if 1
     if (mJpegBufferListener != 0 && mJpegBufferCallback != 0) {
-        (mJpegBufferListener->*ofxSonyRemoteCamera::mJpegBufferCallback )(mApJpegBuffer);
+        mJpegBufferCallback(mJpegBufferListener, mApJpegBuffer);
     }
 #endif
 	// cvt jpeg to bitmap
@@ -792,7 +792,9 @@ std::string ofxSonyRemoteCamera::createJson(const std::string& method, const std
 	for (std::vector<picojson::value>::const_iterator it=params.begin(); it!=params.end(); ++it) {
 		paramArray.push_back(*it);
 	}
-	obj.insert(make_pair("params", paramArray));
+
+//	obj.insert(make_pair("params", paramArray));
+	obj.insert(make_pair("params", picojson::value(paramArray)));
 	return (static_cast<picojson::value>(obj)).serialize();
 }
 

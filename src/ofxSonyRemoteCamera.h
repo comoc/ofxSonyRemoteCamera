@@ -105,10 +105,10 @@ public:
 	// Liveview
 	//-----------------------------------------------------------------
     template <class ListenerClass>
-    SRCError startLiveView(ListenerClass* listener, void(ListenerClass::*callback)(const ofBuffer&)){
-        mJpegBufferListener = reinterpret_cast<ofxSonyRemoteCamera*>(listener);
-        mJpegBufferCallback = reinterpret_cast<void(ofxSonyRemoteCamera::*)(const ofBuffer&)>(callback);
-        return startLiveViewCore();
+    SRCError startLiveView(ListenerClass* listener, void(*callback)(void*, const ofBuffer&)){
+        mJpegBufferListener = reinterpret_cast<ofxSonyRemoteCamera*>(listener);       
+		mJpegBufferCallback = callback;
+		return startLiveViewCore();
     }
     
 	SRCError stopLiveView();
@@ -289,8 +289,7 @@ private:
     ofBuffer mApJpegBuffer;
     
     ofxSonyRemoteCamera* mJpegBufferListener;
-    void(ofxSonyRemoteCamera::*mJpegBufferCallback)(const ofBuffer&);
-    
+	void(*mJpegBufferCallback)(void*, const ofBuffer&);
 
 	// test
 	std::list<MyHttpPostRequest> mHttpPostList;
