@@ -33,9 +33,7 @@ bool ofxSonyRemoteCamera::setup( const std::string& host/*="10.0.0.1"*/, int por
 	mIsLiveViewStreaming = false;
 	mIsVerbose = true;
 	mLiveViewTimestamp = 0;
-	mLastLiveViewTimestamp = 0;
 	mpLiveViewStream = 0;
-	mIsImageSizeUpdated = false;
 
 	mSession.reset();
 	mSession.setHost(mHost);
@@ -56,22 +54,7 @@ void ofxSonyRemoteCamera::exit()
 
 void ofxSonyRemoteCamera::update()
 {
-	if (mIsImageSizeUpdated) {
-		if (lock()) {
-			ofNotifyEvent(imageSizeUpdated, mImageSize);
-			mIsImageSizeUpdated = false;
-			unlock();
-		}
-	}
-	/*
-	if (lock()) {
-		if (mIsImageSizeUpdated) {
-			ofNotifyEvent(imageSizeUpdated, mImageSize);
-			mIsImageSizeUpdated = false;
-		}
-		unlock();
-	}
-	*/
+
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -112,46 +95,9 @@ ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::stopLiveView()
 	return checkError(json);
 }
 
-bool ofxSonyRemoteCamera::isLiveViewFrameNew()
-{
-	if (lock()) {
-		bool isNew(false);
-		if (mLiveViewTimestamp != mLastLiveViewTimestamp) {
-			mLastLiveViewTimestamp = mLiveViewTimestamp;
-			isNew = true;
-		}
-		unlock();
-		return isNew;
-	}
-	return false;
-}
-
 bool ofxSonyRemoteCamera::isLiveViewSessionConnected()
 {
 	return mLiveViewSession.connected();
-}
-
-void ofxSonyRemoteCamera::getLiveViewImage( unsigned char* pImg, int& timestamp )
-{
-	// memcpy_s
-	if (lock()) {
-		timestamp = mCommonHeader.timestamp;
-		memcpy(pImg, mLiveViewPixels.getPixels(), mLiveViewPixels.getWidth()*mLiveViewPixels.getHeight()*mLiveViewPixels.getBytesPerPixel());
-		unlock();
-	} else if (mIsVerbose) {
-		std::cout << "cannot lock" << std::endl;
-	}
-}
-
-void ofxSonyRemoteCamera::getLiveViewImage( ofPixels& pixels, int& timestamp )
-{
-	if (lock()) {
-		timestamp = mCommonHeader.timestamp;
-		pixels = mLiveViewPixels;
-		unlock();
-	} else if (mIsVerbose) {
-		std::cout << "cannot lock" << std::endl;
-	}
 }
 
 int ofxSonyRemoteCamera::getLiveViewImageWidth() const
@@ -587,8 +533,9 @@ std::string ofxSonyRemoteCamera::getShootModeString(ShootMode mode) const
 		return "STILL";
 	case SHOOT_MODE_INTERVAL_STILL:
 		return "INTERVAL STILL";
+    default:
+        return "UNKNOWN";
 	}
-	return "UNKNOWN";
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -713,18 +660,6 @@ bool ofxSonyRemoteCamera::updatePayloadData()
         mJpegBufferCallback(mJpegBufferListener, mApJpegBuffer);
     }
 #endif
-	// cvt jpeg to bitmap
-	if (lock()) {
-		ofLoadImage(mLiveViewPixels, mApJpegBuffer);
-		if ( (mLiveViewPixels.getWidth() != mImageSize.width) || (mLiveViewPixels.getHeight() != mImageSize.height)) {
-			mImageSize.width = mLiveViewPixels.getWidth();
-			mImageSize.height = mLiveViewPixels.getHeight();
-			mIsImageSizeUpdated = true;
-		}
-		unlock();
-	} else if (mIsVerbose) {
-		std::cout << "cannot lock" << std::endl;
-	}
 	return true;
 }
 

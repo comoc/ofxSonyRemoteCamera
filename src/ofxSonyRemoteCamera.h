@@ -57,6 +57,7 @@ public:
 		SHOOT_MODE_STILL,
 		SHOOT_MODE_INTERVAL_STILL,
 		SHOOT_MODE_MOVIE,
+        SHOOT_MODE_UNKNOWN,
 	};
 
 	enum MovieQuality
@@ -112,13 +113,8 @@ public:
     }
     
 	SRCError stopLiveView();
-	bool isLiveViewFrameNew();
 	bool isLiveViewSessionConnected();
-	/*!
-		memorySize = getLiveViewImageWidth() * getLiveViewImageHeight() * 3
-	*/
-	void getLiveViewImage(unsigned char* pImg, int& timestamp);
-	void getLiveViewImage(ofPixels& pixels, int& timestamp);
+
 	/*!
 		this api cannot be used untill live view is updated. 
 	*/
@@ -266,12 +262,8 @@ private:
 	bool mIsVerbose;
 
 	int mLiveViewTimestamp;
-	int mLastLiveViewTimestamp;
 	bool mIsLiveViewStreaming;
 	ofPixels mLiveViewPixels;
-
-	bool mIsImageSizeUpdated;
-	ImageSize mImageSize;
 
 	Poco::Net::HTTPClientSession mLiveViewSession;
 	std::string mLiveViewPath;
