@@ -52,16 +52,13 @@ void ofxSonyRemoteCamera::exit()
 	mSession.reset();
 }
 
-void ofxSonyRemoteCamera::update()
-{
-
-}
-
 //////////////////////////////////////////////////////////////////////////
 // LiveViewAPIs
 //////////////////////////////////////////////////////////////////////////
-ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::startLiveViewCore()
+ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::startLiveView(ofBaseApp* listener, void(ofBaseApp::*liveviewCallback)(const ofBuffer&))
 {
+	mListener = listener;
+	mLiveViewCallback = liveviewCallback;
     
 	waitForThread();
 	mIsLiveViewStreaming = false;
@@ -132,14 +129,36 @@ ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::actTakePicture()
 {
 	const std::string json(httpPost(createJson("actTakePicture"), mSessionCameraPath));
 	picojson::array resultArray;
+	
+	mPostViewPath = "";
 	if (getJsonResultArray(resultArray, json)) {
-		mPostViewPath = resultArray[0].get<std::string>();
+		if (resultArray.empty())
+			return SRCError::SRC_ERROR_ANY;
+		if (resultArray.at(0).to_str() != "array")
+			return SRCError::SRC_ERROR_ANY;
+		if (resultArray.at(0).get<picojson::array>().empty())
+			return SRCError::SRC_ERROR_ANY;
+		mPostViewPath = resultArray.at(0).get<picojson::array>().at(0).to_str();
+
+		{
+			Poco::URI uri(mPostViewPath);
+			Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery(), Poco::Net::HTTPMessage::HTTP_1_1);
+			Poco::Net::HTTPResponse response;
+			mSession.sendRequest(request);
+			istream& res = mSession.receiveResponse(response);
+			if (response.getStatus() == Poco::Net::HTTPResponse::HTTP_OK && !res.eof()) {
+				if (res.gcount() > 0) {
+					ofBuffer buf;
+					buf.allocate(res.gcount());
+					res.read(buf.getBinaryBuffer(), buf.size());
+				} else {
+					cout << "ofxSonyRemoteCamera::actTakePicture() : " << "the result size of GET is 0"
+						<< endl << "\tfrom : " << mPostViewPath << endl;
+				}
+			}
+		}
 	}
 	return checkError(json);
-	/*
-	httpPostAsync(createJson("actTakePicture"), mSessionCameraPath);
-	return SRC_OK;
-	*/
 }
 
 ofxSonyRemoteCamera::SRCError ofxSonyRemoteCamera::awaitTakePicture()
@@ -547,7 +566,9 @@ void ofxSonyRemoteCamera::threadedFunction()
 		if (!updateLiveView()) {
 			this->sleep(1);
 		}
-		//updateRequest();
+#ifndef NO_ASYNC
+		updateRequest();
+#endif
 	}
 }
 
@@ -656,13 +677,14 @@ bool ofxSonyRemoteCamera::updatePayloadData()
 		return false;
 	}
 #if 1
-    if (mJpegBufferListener != 0 && mJpegBufferCallback != 0) {
-        mJpegBufferCallback(mJpegBufferListener, mApJpegBuffer);
+    if (mListener != 0 && mLiveViewCallback != 0) {
+        (mListener->*mLiveViewCallback)(mApJpegBuffer);
     }
 #endif
 	return true;
 }
 
+#ifndef NO_ASYNC
 void ofxSonyRemoteCamera::updateRequest()
 {
 	lock();
@@ -670,14 +692,15 @@ void ofxSonyRemoteCamera::updateRequest()
 	mHttpPostListEntry.clear();
 	unlock();
 	while (mHttpPostList.size()) {
-		const std::string json(httpPost(mHttpPostList.front().json, mHttpPostList.front().path));
+		const std::string json(httpPost(mHttpPostList.front().json, mHttpPostList.front().path), 1000);
 		std::cout << json << std::endl;
 		mHttpPostList.pop_front();
 	}
 	
 }
+#endif
 
-std::string ofxSonyRemoteCamera::httpPost( const std::string& json, const std::string& path )
+std::string ofxSonyRemoteCamera::httpPost( const std::string& json, const std::string& path)
 {
 	Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_POST, path, Poco::Net::HTTPMessage::HTTP_1_1);
 	request.setContentLength(json.length());
@@ -696,6 +719,7 @@ std::string ofxSonyRemoteCamera::httpPost( const std::string& json, const std::s
 	return "";
 }
 
+#ifndef NO_ASYNC
 std::string ofxSonyRemoteCamera::httpPostAsync( const std::string& json, const std::string& path )
 {
 	MyHttpPostRequest r(json, path);
@@ -704,6 +728,7 @@ std::string ofxSonyRemoteCamera::httpPostAsync( const std::string& json, const s
 	unlock();
 	return "";
 }
+#endif
 
 picojson::value ofxSonyRemoteCamera::parse(const std::string& json) const
 {

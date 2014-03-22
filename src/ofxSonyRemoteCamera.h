@@ -19,6 +19,8 @@
 #define BYTE uint8_t
 #endif
 
+#define NO_ASYNC
+
 class ofxSonyRemoteCamera : public ofThread
 {
 public:
@@ -98,20 +100,11 @@ public:
 	~ofxSonyRemoteCamera();
 	bool setup(const std::string& host="10.0.0.1", int port=10000);
 	void exit();
-	void update();
-
-	ofEvent<ImageSize> imageSizeUpdated;
 
 	//-----------------------------------------------------------------
 	// Liveview
 	//-----------------------------------------------------------------
-    template <class ListenerClass>
-    SRCError startLiveView(ListenerClass* listener, void(*callback)(void*, const ofBuffer&)){
-        mJpegBufferListener = reinterpret_cast<ofxSonyRemoteCamera*>(listener);       
-		mJpegBufferCallback = callback;
-		return startLiveViewCore();
-    }
-    
+    SRCError startLiveView(ofBaseApp* listener, void(ofBaseApp::*liveviewCallback)(const ofBuffer&));
 	SRCError stopLiveView();
 	bool isLiveViewSessionConnected();
 
@@ -225,17 +218,20 @@ public:
 
 private:
 	virtual void threadedFunction();
-    SRCError startLiveViewCore();
 	bool updateLiveView();
 	bool updateCommonHeader();
 	bool updatePayloadHeader();
 	bool updatePayloadData();
+#ifndef NO_ASYNC
 	void updateRequest();
+#endif
 	bool openLiveViewSession(const std::string& host, int port);
 	void closeLiveViewSession();
 
 	std::string httpPost(const std::string& json, const std::string& path);
+#ifndef NO_ASYNC
 	std::string httpPostAsync(const std::string& json, const std::string& path);
+#endif
 
 	//json	
 	std::string createJson(const std::string& method, const std::vector<picojson::value>& params=std::vector<picojson::value>()) const;
@@ -280,11 +276,12 @@ private:
     
     ofBuffer mApJpegBuffer;
     
-    ofxSonyRemoteCamera* mJpegBufferListener;
-	void(*mJpegBufferCallback)(void*, const ofBuffer&);
+	ofBaseApp* mListener;
+	void(ofBaseApp::*mLiveViewCallback)(const ofBuffer&);
 
+#ifndef NO_ASYNC
 	// test
 	std::list<MyHttpPostRequest> mHttpPostList;
 	std::list<MyHttpPostRequest> mHttpPostListEntry;
-
+#endif
 };
